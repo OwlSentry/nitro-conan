@@ -134,28 +134,17 @@ class NitroConan(ConanFile):
         # works after the package moves between cache slots.
         tc.cache_variables["CMAKE_INSTALL_NAME_DIR"] = "@rpath"
         if self.settings.os == "Macos":
-            # coda-oss's XML_HOME link-probe (modules/drivers/xml/xerces/
-            # CMakeLists.txt:36-50) only adds `pthread` to its check_cxx_source_
-            # compiles call. Apple xerces needs CoreServices/CoreFoundation
-            # frameworks too, so the probe fails. Skip it — Conan's xerces is
-            # known good.
             tc.cache_variables["XERCES_HOME_VALID"] = True
-            # Xcode 15 / Apple clang 15+ defaults -Wimplicit-function-declaration
-            # to an error. coda-oss's vendored zlib (gzlib.c) calls lseek without
-            # including <unistd.h> because gzguts.h gates that include on
-            # HAVE_UNISTD_H, which the driver build doesn't set. Demote to warning
-            # so the bundled C drivers (zlib, jpeg, pcre2) still compile cleanly.
-            tc.extra_cflags.append("-Wno-error=implicit-function-declaration")
-            # coda-oss unconditionally passes GCC-only warning flags (-Wduplicated-
-            # branches, -Wtrampolines, -Wno-maybe-uninitialized) on non-MSVC builds.
-            # Apple clang doesn't recognise them and errors under -Werror. Demote
-            # unknown-warning-option to a warning so they stay visible in logs but
-            # don't fail the build. Applies to both C and C++ — Backtrace.cpp is C++,
-            # the driver sources are C.
-            unknown_warn = "-Wno-error=unknown-warning-option"
-            tc.extra_cflags.append(unknown_warn)
-            tc.extra_cxxflags.append(unknown_warn)
             tc.cache_variables["CODA_BUILD_HDF5"] = False
+
+            # coda-oss enables -Werror project-wide for GNU|Clang. Apple Clang flags
+            # warnings that GCC doesn't (-Wunused-but-set-variable, -Wimplicit-
+            # function-declaration in vendored zlib, etc.), so -Werror produces a
+            # steady drip of build failures across coda-oss + bundled drivers.
+            # Disable -Werror entirely on macOS — this is vendored upstream code we
+            # don't own; warnings stay visible in build logs but don't fail the build.
+            tc.extra_cflags.append("-Wno-error")
+            tc.extra_cxxflags.append("-Wno-error")
 
         # Public header switch — must be visible to consumers too (see package_info).
         if self.options.preload_tres:
