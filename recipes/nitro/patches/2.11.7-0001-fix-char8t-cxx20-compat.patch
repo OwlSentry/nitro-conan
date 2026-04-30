@@ -1,0 +1,24 @@
+From: Conan recipe maintainer
+Subject: [PATCH] Silence -Wc++20-compat for the char8_t enum-class workaround
+
+coda-oss defines `char8_t` as an `enum class` (legal in C++14/17) for
+codebases that don't yet have C++20. Under gcc 10+, this triggers the
+-Wc++20-compat warning, which becomes a hard error because coda-oss
+adds -Werror via add_compile_options() — overriding any -Wno-error
+flag passed in CMAKE_CXX_FLAGS.
+
+Wrap the enum in a GCC diagnostic push/pop so the warning is suppressed
+locally without disabling -Werror globally.
+
+--- a/externals/coda-oss/modules/c++/coda_oss/include/coda_oss/string.h
++++ b/externals/coda-oss/modules/c++/coda_oss/include/coda_oss/string.h
+@@ -54 +54,8 @@
+-        enum class char8_t : unsigned char { }; // https://en.cppreference.com/w/cpp/language/types
++#if defined(__GNUC__) && !defined(__clang__)
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wc++20-compat"
++#endif
++        enum class char8_t : unsigned char { }; // https://en.cppreference.com/w/cpp/language/types
++#if defined(__GNUC__) && !defined(__clang__)
++#pragma GCC diagnostic pop
++#endif

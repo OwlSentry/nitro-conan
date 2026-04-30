@@ -1,0 +1,10 @@
+sources:
+  "2.11.7":
+    url: "https://github.com/mdaus/nitro/archive/refs/tags/NITRO-2.11.7.tar.gz"
+    sha256: "47bbb8cff9faeed2fa2be302a2276f0198f05905aa769373343916d89e04dbcc"
+
+patches:
+  "2.11.7":
+    - patch_file: "patches/2.11.7-0001-fix-char8t-cxx20-compat.patch"
+      patch_description: "Silence -Wc++20-compat warning on the char8_t enum-class so coda-oss's -Werror doesn't abort the build under gcc 10+."
+      patch_type: "portability"
