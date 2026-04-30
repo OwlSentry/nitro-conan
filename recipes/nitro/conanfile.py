@@ -153,8 +153,9 @@ class NitroConan(ConanFile):
                 "-Wno-error=incompatible-function-pointer-types",
                 "-Wno-error=unknown-warning-option",
                 "-Wno-error=unused-but-set-variable",
-                "-Wno-error=deprecated-declarations",   # vsprintf in Format.cpp
-                "-Wno-error=unused-function",            # utf16to1252 in Encoding.cpp
+                "-Wno-error=deprecated-declarations",
+                "-Wno-error=unused-function",
+                "-Wno-error=invalid-utf8",   # Manip.cpp Latin-1 high bytes in comments
             ]
             tc.extra_cflags.extend(macos_warning_flags)
             tc.extra_cxxflags.extend(macos_warning_flags)
