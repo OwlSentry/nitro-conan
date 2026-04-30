@@ -1,4 +1,4 @@
-@@
+@@ -1 +1 @@
 -    #elif defined(__GNUC__)
 +    #elif defined(CODA_OSS_HAS_BSWAP_BUILTINS)
      inline uint16_t byteswap(uint16_t val) noexcept

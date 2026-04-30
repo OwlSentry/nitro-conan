@@ -1,6 +1,6 @@
 --- a/externals/coda-oss/modules/c++/sys/include/sys/OS.h
 +++ b/externals/coda-oss/modules/c++/sys/include/sys/OS.h
-@@
+@@ -1 +1 @@
  enum class PlatformType
  {
      Windows,
