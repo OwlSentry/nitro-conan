@@ -1,0 +1,29 @@
+@@
+-    #elif defined(__GNUC__)
++    #elif defined(CODA_OSS_HAS_BSWAP_BUILTINS)
+     inline uint16_t byteswap(uint16_t val) noexcept
+     {
+         return bswap_16(val);
+     }
+     inline uint32_t byteswap(uint32_t val) noexcept
+     {
+         return bswap_32(val);
+     }
+     inline uint64_t byteswap(uint64_t val) noexcept
+     {
+         return bswap_64(val);
+     }
++    #elif defined(__GNUC__) || defined(__clang__)
++    inline uint16_t byteswap(uint16_t val) noexcept
++    {
++        return __builtin_bswap16(val);
++    }
++    inline uint32_t byteswap(uint32_t val) noexcept
++    {
++        return __builtin_bswap32(val);
++    }
++    inline uint64_t byteswap(uint64_t val) noexcept
++    {
++        return __builtin_bswap64(val);
++    }
+     #else

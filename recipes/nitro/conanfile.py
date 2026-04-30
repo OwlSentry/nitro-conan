@@ -5,7 +5,6 @@ from conan.tools.build import check_min_cppstd
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 from conan.tools.files import (
     apply_conandata_patches, copy, export_conandata_patches, get, rmdir, rm,
-    replace_in_file,
 )
 from conan.tools.apple import fix_apple_shared_install_name
 
@@ -28,29 +27,29 @@ class NitroConan(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
 
     options = {
-        "shared":        [True, False],
-        "fPIC":          [True, False],
-        "enable_j2k":    [True, False],   # ENABLE_J2K   (bundled openjpeg)
-        "enable_jpeg":   [True, False],   # ENABLE_JPEG  (bundled libjpeg, runtime plugin)
-        "enable_zip":    [True, False],   # ENABLE_ZIP   (bundled zlib)
-        "enable_pcre":   [True, False],   # ENABLE_PCRE  (bundled pcre2)
-        "with_uuid":     [True, False],   # ENABLE_UUID — Linux/FreeBSD only
-        "preload_tres":  [True, False],   # NITRO 2.11.6+: static TRE preloading (public macro)
-        "enable_hdf5":   [True, False],   # ENABLE_HDF5 — Linux-only in current form
+        "shared":       [True, False],
+        "fPIC":         [True, False],
+        "enable_j2k":   [True, False],   # ENABLE_J2K   (bundled openjpeg)
+        "enable_jpeg":  [True, False],   # ENABLE_JPEG  (bundled libjpeg, runtime plugin)
+        "enable_zip":   [True, False],   # ENABLE_ZIP   (bundled zlib)
+        "enable_pcre":  [True, False],   # ENABLE_PCRE  (bundled pcre2)
+        "with_uuid":    [True, False],   # ENABLE_UUID — Linux/FreeBSD only
+        "preload_tres": [True, False],   # NITRO 2.11.6+: static TRE preloading (public macro)
+        "enable_hdf5":  [True, False],   # CODA_ENABLE_HDF5 — upstream toggle; HDF5 driver is glibc-only
     }
     default_options = {
-        "shared":        False,
-        "fPIC":          True,
-        "enable_j2k":    True,
-        "enable_jpeg":   True,
-        "enable_zip":    True,
-        "enable_pcre":   True,
-        "with_uuid":     True,
-        "preload_tres":  True,
+        "shared":       False,
+        "fPIC":         True,
+        "enable_j2k":   True,
+        "enable_jpeg":  True,
+        "enable_zip":   True,
+        "enable_pcre":  True,
+        "with_uuid":    True,
+        "preload_tres": True,
+        "enable_hdf5":  False,
         # coda-oss's xml.lite hard-asserts XMLCh == char16_t; CCI xerces defaults
         # to uint16_t. Pin the type so the assert holds.
         "xerces-c/*:char_type": "char16_t",
-         "enable_hdf5":  False,
     }
 
     implements = ["auto_shared_fpic"]
@@ -85,115 +84,13 @@ class NitroConan(ConanFile):
         xch = self.dependencies["xerces-c"].options.get_safe("char_type")
         if xch != "char16_t":
             raise ConanInvalidConfiguration(
-             f"{self.ref} requires xerces-c/*:char_type=char16_t (got {xch}). "
-             f"coda-oss's ValidatorXerces.cpp asserts XMLCh == char16_t."
-         )
+                f"{self.ref} requires xerces-c/*:char_type=char16_t (got {xch}). "
+                f"coda-oss's ValidatorXerces.cpp asserts XMLCh == char16_t."
+            )
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
         apply_conandata_patches(self)
-
-        # Add an option gate around the bundled HDF5 driver. Defaults ON, so
-        # Linux builds behave exactly as before. The macOS branch of generate()
-        # flips it off because the vendored H5pubconf.h includes <features.h>,
-        # which is glibc-only. Settings-agnostic by design — Conan 2 forbids
-        # self.settings access in source().
-        drivers_cml = os.path.join(
-            self.source_folder, "externals", "coda-oss",
-            "modules", "drivers", "CMakeLists.txt",
-        )
-        replace_in_file(
-            self, drivers_cml,
-            'add_subdirectory("hdf5")',
-            'option(CODA_BUILD_HDF5 "Build the bundled HDF5 driver" ON)\n'
-            'if (CODA_BUILD_HDF5)\n'
-            '    add_subdirectory("hdf5")\n'
-            'endif()',
-        )
-
-        sys_conf_h = os.path.join(
-        self.source_folder, "externals", "coda-oss",
-        "modules", "c++", "sys", "include", "sys", "Conf.h",
-        )
-        replace_in_file(
-            self, sys_conf_h,
-            "#include <features.h>",
-            "#if defined(__has_include)\n"
-            "#  if __has_include(<features.h>)\n"
-            "#    include <features.h>\n"
-            "#  endif\n"
-            "#elif defined(__linux__)\n"
-            "#  include <features.h>\n"
-            "#endif",
-        )
-
-        bit_h = os.path.join(
-            self.source_folder, "externals", "coda-oss",
-            "modules", "c++", "coda_oss", "include", "coda_oss", "bit.h",
-        )
-
-        # coda_oss/bit.h confuses __GNUC__ (any GCC-compatible compiler, including
-        # Apple Clang) with glibc (which provides <byteswap.h> and bswap_*).
-        # On macOS, Apple Clang defines __GNUC__ but libSystem has no <byteswap.h>.
-        # Use __has_include to detect the header instead, and route Apple Clang to
-        # the compiler builtins (which GCC and Clang both have).
-
-        # Fix 1: gate the include on header availability, not compiler identity.
-        replace_in_file(
-            self, bit_h,
-            "#ifdef __GNUC__\n"
-            "#include <byteswap.h>  // \"These functions are GNU extensions.\"\n"
-            "#endif",
-            "#if defined(__has_include) && __has_include(<byteswap.h>)\n"
-            "#  include <byteswap.h>\n"
-            "#  define CODA_OSS_HAS_BSWAP_BUILTINS 1\n"
-            "#endif",
-        )
-
-        # Fix 2: gate the bswap_* call sites on the same flag, with __builtin_bswap_*
-        # fallbacks that work on both Clang and GCC.
-        replace_in_file(
-            self, bit_h,
-            "    #elif defined(__GNUC__)\n"
-            "    inline uint16_t byteswap(uint16_t val) noexcept\n"
-            "    {\n"
-            "        return bswap_16(val);\n"
-            "    }\n"
-            "    inline uint32_t byteswap(uint32_t val) noexcept\n"
-            "    {\n"
-            "        return bswap_32(val);\n"
-            "    }\n"
-            "    inline uint64_t byteswap(uint64_t val) noexcept\n"
-            "    {\n"
-            "        return bswap_64(val);\n"
-            "    }",
-            "    #elif defined(CODA_OSS_HAS_BSWAP_BUILTINS)\n"
-            "    inline uint16_t byteswap(uint16_t val) noexcept\n"
-            "    {\n"
-            "        return bswap_16(val);\n"
-            "    }\n"
-            "    inline uint32_t byteswap(uint32_t val) noexcept\n"
-            "    {\n"
-            "        return bswap_32(val);\n"
-            "    }\n"
-            "    inline uint64_t byteswap(uint64_t val) noexcept\n"
-            "    {\n"
-            "        return bswap_64(val);\n"
-            "    }\n"
-            "    #elif defined(__GNUC__) || defined(__clang__)\n"
-            "    inline uint16_t byteswap(uint16_t val) noexcept\n"
-            "    {\n"
-            "        return __builtin_bswap16(val);\n"
-            "    }\n"
-            "    inline uint32_t byteswap(uint32_t val) noexcept\n"
-            "    {\n"
-            "        return __builtin_bswap32(val);\n"
-            "    }\n"
-            "    inline uint64_t byteswap(uint64_t val) noexcept\n"
-            "    {\n"
-            "        return __builtin_bswap64(val);\n"
-            "    }",
-        )
 
     def generate(self):
         tc = CMakeToolchain(self)
@@ -208,29 +105,36 @@ class NitroConan(ConanFile):
         # tarballs under externals/coda-oss/modules/drivers/ and links them
         # statically into nrt-c / nitf-c / the plug-ins. The exception is XML,
         # where Xerces from Conan tends to "just work" via XML_HOME.
-        tc.cache_variables["ENABLE_J2K"]  = bool(self.options.enable_j2k)
-        tc.cache_variables["ENABLE_JPEG"] = bool(self.options.enable_jpeg)
-        tc.cache_variables["ENABLE_ZIP"]  = bool(self.options.enable_zip)
-        tc.cache_variables["ENABLE_PCRE"] = bool(self.options.enable_pcre)
-        tc.cache_variables["ENABLE_UUID"] = bool(self.options.get_safe("with_uuid", False))
+        tc.cache_variables["ENABLE_J2K"]   = bool(self.options.enable_j2k)
+        tc.cache_variables["ENABLE_JPEG"]  = bool(self.options.enable_jpeg)
+        tc.cache_variables["ENABLE_ZIP"]   = bool(self.options.enable_zip)
+        tc.cache_variables["ENABLE_PCRE"]  = bool(self.options.enable_pcre)
+        tc.cache_variables["ENABLE_UUID"]  = bool(self.options.get_safe("with_uuid", False))
+        tc.cache_variables["CODA_ENABLE_HDF5"] = bool(self.options.enable_hdf5)
         tc.cache_variables["XML_HOME"] = self.dependencies["xerces-c"].package_folder
         # macOS: keep install_name @rpath-relative so consumers' dyld resolution
         # works after the package moves between cache slots.
         tc.cache_variables["CMAKE_INSTALL_NAME_DIR"] = "@rpath"
-        if self.settings.os == "Macos":
-            tc.cache_variables["XERCES_HOME_VALID"] = True
-            tc.cache_variables["CODA_BUILD_HDF5"] = False
 
-            # Per-warning -Wno-error=<name> demotions only — bare -Wno-error doesn't
-            # stick because coda-oss's add_compile_options(-Werror) lands *after* our
-            # CMAKE_CXX_FLAGS in the compile line. Per-warning demotions ARE sticky:
-            # Clang doesn't re-promote them via a later -Werror.
+        if self.settings.os == "Macos":
+            # coda-oss's XML_HOME link-probe only adds `pthread` to its
+            # check_cxx_source_compiles call. Apple xerces additionally needs
+            # CoreServices/CoreFoundation frameworks (the link-probe patch in
+            # 0002 fixes the test source); pre-set the cache variable so the
+            # probe is skipped — Conan's xerces is known good.
+            tc.cache_variables["XERCES_HOME_VALID"] = True
+
+            # Per-warning -Wno-error=<name> demotions covering two failure modes:
+            #  1. Apple Clang (Xcode 15+) default-errors — fail regardless of
+            #     -Werror; hit by vintage C in bundled zlib/jpeg/pcre2.
+            #  2. -Werror promotions of warnings Apple Clang emits but GCC
+            #     doesn't — GCC-only -W flag names, dead assignments, deprecated
+            #     POSIX functions in the macOS SDK, etc.
             #
-            # Two failure modes covered:
-            #  1. Apple Clang (Xcode 15+) default-errors — fail regardless of -Werror,
-            #     hit by vintage C in bundled zlib/jpeg/pcre2.
-            #  2. -Werror promotions of warnings Apple Clang emits but GCC doesn't —
-            #     GCC-only -W flag names, alt_format-style dead assignments, etc.
+            # Bare -Wno-error doesn't stick because coda-oss's project-level
+            # add_compile_options(-Werror) lands *after* our CMAKE_CXX_FLAGS in
+            # the compile line. Per-warning demotions ARE sticky: Clang doesn't
+            # re-promote them via a later -Werror.
             macos_warning_flags = [
                 "-Wno-error=implicit-function-declaration",
                 "-Wno-error=implicit-int",
@@ -256,7 +160,7 @@ class NitroConan(ConanFile):
         cmake.build()
 
     def package(self):
-        fix_apple_shared_install_name(self) 
+        fix_apple_shared_install_name(self)
         copy(self, "COPYING",        src=os.path.join(self.source_folder, "modules", "c", "nitf"),
                                      dst=os.path.join(self.package_folder, "licenses"))
         copy(self, "COPYING.LESSER", src=os.path.join(self.source_folder, "modules", "c", "nitf"),

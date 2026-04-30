@@ -1,0 +1,39 @@
+--- a/externals/coda-oss/modules/c++/sys/include/sys/Conf.h
++++ b/externals/coda-oss/modules/c++/sys/include/sys/Conf.h
+@@
+-#ifndef _WIN32
+-#include <features.h>
+-#endif
++#ifndef _WIN32
++#  if defined(__has_include)
++#    if __has_include(<features.h>)
++#      include <features.h>
++#    endif
++#  elif defined(__linux__)
++#    include <features.h>
++#  endif
++#endif
+@@
+ #undef CODA_OSS_POSIX_SOURCE
+ #if defined(_POSIX_C_SOURCE) && (_POSIX_C_SOURCE >= 1)
+ #define CODA_OSS_POSIX_SOURCE _POSIX_C_SOURCE
++#elif defined(__APPLE__)
++// macOS is POSIX-compliant but doesn't define _POSIX_C_SOURCE the same way
++// glibc does. Set the CODA_OSS_POSIX*_SOURCE macros directly so alignedAlloc
++// and the Platform typedef route to the existing POSIX paths.
++#define CODA_OSS_POSIX_SOURCE 200809L
+ #endif
+
+ #undef CODA_OSS_POSIX2001_SOURCE
+ #if defined(CODA_OSS_POSIX_SOURCE) && (_POSIX_C_SOURCE >= 200112L)
+ #define CODA_OSS_POSIX2001_SOURCE _POSIX_C_SOURCE
++#elif defined(__APPLE__)
++#define CODA_OSS_POSIX2001_SOURCE 200809L
+ #endif
+
+ #undef CODA_OSS_POSIX2008_SOURCE
+ #if defined(CODA_OSS_POSIX2001_SOURCE) && (_POSIX_C_SOURCE >= 200809L)
+ #define CODA_OSS_POSIX2008_SOURCE _POSIX_C_SOURCE
++#elif defined(__APPLE__)
++#define CODA_OSS_POSIX2008_SOURCE 200809L
+ #endif
