@@ -4,6 +4,7 @@ from conan.errors import ConanInvalidConfiguration
 from conan.tools.build import check_min_cppstd
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get, rmdir, rm
+from conan.tools.apple import fix_apple_shared_install_name
 
 required_conan_version = ">=2.4"
 
@@ -124,6 +125,7 @@ class NitroConan(ConanFile):
         cmake.build()
 
     def package(self):
+        fix_apple_shared_install_name(self) 
         copy(self, "COPYING",        src=os.path.join(self.source_folder, "modules", "c", "nitf"),
                                      dst=os.path.join(self.package_folder, "licenses"))
         copy(self, "COPYING.LESSER", src=os.path.join(self.source_folder, "modules", "c", "nitf"),
