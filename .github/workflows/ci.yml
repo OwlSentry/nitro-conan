@@ -51,7 +51,7 @@ jobs:
           conan profile show
 
       - name: conan create
-        run: conan create recipes/nitro --build=missing -s compiler.cppstd=17
+        run: conan create recipes/nitro --build=missing
 
       - name: Dump CMake error logs on failure
         if: failure()
