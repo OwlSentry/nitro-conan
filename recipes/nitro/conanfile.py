@@ -31,7 +31,6 @@ class NitroConan(ConanFile):
         "enable_jpeg":   [True, False],   # ENABLE_JPEG  (bundled libjpeg, runtime plugin)
         "enable_zip":    [True, False],   # ENABLE_ZIP   (bundled zlib)
         "enable_pcre":   [True, False],   # ENABLE_PCRE  (bundled pcre2)
-        "enable_xml":    [True, False],   # XML_HOME (Xerces-C — wired below if True)
         "with_uuid":     [True, False],   # ENABLE_UUID — Linux/FreeBSD only
         "preload_tres":  [True, False],   # NITRO 2.11.6+: static TRE preloading (public macro)
     }
@@ -42,7 +41,6 @@ class NitroConan(ConanFile):
         "enable_jpeg":   True,
         "enable_zip":    True,
         "enable_pcre":   True,
-        "enable_xml":    False,
         "with_uuid":     True,
         "preload_tres":  True,
         # coda-oss's xml.lite hard-asserts XMLCh == char16_t; CCI xerces defaults
@@ -68,8 +66,7 @@ class NitroConan(ConanFile):
         cmake_layout(self, src_folder="src")
 
     def requirements(self):
-        if self.options.enable_xml:
-            self.requires("xerces-c/3.2.5")
+        self.requires("xerces-c/3.2.5")
 
     def validate(self):
         if self.settings.os not in ("Linux", "Macos", "FreeBSD"):
@@ -79,13 +76,13 @@ class NitroConan(ConanFile):
             )
         if self.settings.compiler.cppstd:
             check_min_cppstd(self, self._min_cppstd)
-        if self.options.enable_xml:
-            xch = self.dependencies["xerces-c"].options.get_safe("char_type")
-            if xch != "char16_t":
-                raise ConanInvalidConfiguration(
-                    f"{self.ref} with enable_xml=True requires xerces-c/*:char_type=char16_t "
-                    f"(got {xch}). coda-oss's ValidatorXerces.cpp asserts XMLCh == char16_t."
-                )
+
+        xch = self.dependencies["xerces-c"].options.get_safe("char_type")
+        if xch != "char16_t":
+            raise ConanInvalidConfiguration(
+                f"{self.ref} with enable_xml=True requires xerces-c/*:char_type=char16_t "
+                f"(got {xch}). coda-oss's ValidatorXerces.cpp asserts XMLCh == char16_t."
+            )
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
@@ -109,8 +106,7 @@ class NitroConan(ConanFile):
         tc.cache_variables["ENABLE_ZIP"]  = bool(self.options.enable_zip)
         tc.cache_variables["ENABLE_PCRE"] = bool(self.options.enable_pcre)
         tc.cache_variables["ENABLE_UUID"] = bool(self.options.get_safe("with_uuid", False))
-        if self.options.enable_xml:
-            tc.cache_variables["XML_HOME"] = self.dependencies["xerces-c"].package_folder
+        tc.cache_variables["XML_HOME"] = self.dependencies["xerces-c"].package_folder
         # macOS: keep install_name @rpath-relative so consumers' dyld resolution
         # works after the package moves between cache slots.
         tc.cache_variables["CMAKE_INSTALL_NAME_DIR"] = "@rpath"
@@ -182,8 +178,7 @@ class NitroConan(ConanFile):
         nitf_cpp.set_property("cmake_target_name", "nitf-c++")
         nitf_cpp.libs = cxx_libs
         nitf_cpp.requires = ["nitf-c"]
-        if self.options.enable_xml:
-            nitf_cpp.requires.append("xerces-c::xerces-c")
+        nitf_cpp.requires.append("xerces-c::xerces-c")
 
         # Runtime: tell consumers where the TRE plug-ins live so dlopen finds them.
         # This is the ONLY mechanism that actually controls the runtime probe;
