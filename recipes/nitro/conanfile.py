@@ -117,6 +117,13 @@ class NitroConan(ConanFile):
             # frameworks too, so the probe fails. Skip it — Conan's xerces is
             # known good.
             tc.cache_variables["XERCES_HOME_VALID"] = True
+            # Xcode 15 / Apple clang 15+ defaults -Wimplicit-function-declaration
+            # to an error. coda-oss's vendored zlib (gzlib.c) calls lseek without
+            # including <unistd.h> because gzguts.h gates that include on
+            # HAVE_UNISTD_H, which the driver build doesn't set. Demote to warning
+            # so the bundled C drivers (zlib, jpeg, pcre2) still compile cleanly.
+            tc.extra_cflags.append("-Wno-error=implicit-function-declaration")
+            
         # Public header switch — must be visible to consumers too (see package_info).
         if self.options.preload_tres:
             tc.preprocessor_definitions["NITRO_PRELOAD_TRES"] = "1"
