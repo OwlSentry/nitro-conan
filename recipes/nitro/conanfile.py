@@ -111,6 +111,22 @@ class NitroConan(ConanFile):
             'endif()',
         )
 
+        sys_conf_h = os.path.join(
+        self.source_folder, "externals", "coda-oss",
+        "modules", "c++", "sys", "include", "sys", "Conf.h",
+        )
+        replace_in_file(
+            self, sys_conf_h,
+            "#include <features.h>",
+            "#if defined(__has_include)\n"
+            "#  if __has_include(<features.h>)\n"
+            "#    include <features.h>\n"
+            "#  endif\n"
+            "#elif defined(__linux__)\n"
+            "#  include <features.h>\n"
+            "#endif",
+        )
+
     def generate(self):
         tc = CMakeToolchain(self)
         # Bindings + tests + tooling — all OFF.
