@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel in-flight runs for the same PR/branch when new commits arrive.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            runner: ubuntu-24.04
+          - name: linux-aarch64
+            runner: ubuntu-24.04-arm
+          - name: macos-arm64
+            runner: macos-14   # M1, arm64-only
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Conan
+        run: |
+          python -m pip install --upgrade pip
+          pip install "conan>=2.4"
+
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2/p
+          key: conan-${{ matrix.name }}-${{ hashFiles('conanfile.py', 'conandata.yml', 'patches/**') }}
+          restore-keys: |
+            conan-${{ matrix.name }}-
+
+      - name: Detect default profile
+        run: |
+          conan profile detect --force
+          conan profile show
+
+      - name: conan create
+        run: conan create . --build=missing -s compiler.cppstd=17
+
+      - name: Verify package contents
+        shell: bash
+        run: |
+          PKG=$(conan cache path nitro/2.11.7)
+          echo "Package folder: $PKG"
+          echo "--- libs ---"
+          ls "$PKG/lib" | head -40
+          echo "--- TRE plugins ---"
+          ls "$PKG/share/nitf/plugins" | head -10
+          echo "--- arch check ---"
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            FIRST_LIB=$(find "$PKG/lib" -maxdepth 1 \( -name '*.dylib' -o -name '*.a' \) | head -1)
+            file "$FIRST_LIB"
+            if [[ "$FIRST_LIB" == *.dylib ]]; then
+              echo "--- install_name ---"
+              otool -D "$FIRST_LIB"
+              echo "--- linkage ---"
+              otool -L "$FIRST_LIB" | grep -v '/usr/lib' | grep -v '/System' || true
+            fi
+          else
+            FIRST_LIB=$(find "$PKG/lib" -maxdepth 1 \( -name '*.so*' -o -name '*.a' \) | head -1)
+            file "$FIRST_LIB"
+          fi
