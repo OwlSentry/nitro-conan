@@ -94,21 +94,21 @@ class NitroConan(ConanFile):
         apply_conandata_patches(self)
 
         if self.settings.os == "Macos":
-        # Drop the bundled HDF5 driver on macOS only. coda-oss doesn't expose
-        # an ENABLE_HDF5 toggle (verified against upstream's conanfile.py),
-        # and the vendored H5pubconf.h unconditionally includes <features.h>,
-        # which is glibc-only. nitro-c/c++ has no dependency on hdf5-c++, so
-        # removing the add_subdirectory is sufficient. Linux builds are
-        # unaffected.
-        drivers_cml = os.path.join(
-            self.source_folder, "externals", "coda-oss",
-            "modules", "drivers", "CMakeLists.txt",
-        )
-        replace_in_file(
-            self, drivers_cml,
-            'add_subdirectory("hdf5")',
-            '# add_subdirectory("hdf5")  # disabled on macOS: glibc-only H5pubconf.h',
-        )
+            # Drop the bundled HDF5 driver on macOS only. coda-oss doesn't expose
+            # an ENABLE_HDF5 toggle (verified against upstream's conanfile.py),
+            # and the vendored H5pubconf.h unconditionally includes <features.h>,
+            # which is glibc-only. nitro-c/c++ has no dependency on hdf5-c++, so
+            # removing the add_subdirectory is sufficient. Linux builds are
+            # unaffected.
+            drivers_cml = os.path.join(
+                self.source_folder, "externals", "coda-oss",
+                "modules", "drivers", "CMakeLists.txt",
+            )
+            replace_in_file(
+                self, drivers_cml,
+                'add_subdirectory("hdf5")',
+                '# add_subdirectory("hdf5")  # disabled on macOS: glibc-only H5pubconf.h',
+            )
 
     def generate(self):
         tc = CMakeToolchain(self)
