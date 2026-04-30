@@ -131,16 +131,68 @@ class NitroConan(ConanFile):
             self.source_folder, "externals", "coda-oss",
             "modules", "c++", "coda_oss", "include", "coda_oss", "bit.h",
         )
+
+        # coda_oss/bit.h confuses __GNUC__ (any GCC-compatible compiler, including
+        # Apple Clang) with glibc (which provides <byteswap.h> and bswap_*).
+        # On macOS, Apple Clang defines __GNUC__ but libSystem has no <byteswap.h>.
+        # Use __has_include to detect the header instead, and route Apple Clang to
+        # the compiler builtins (which GCC and Clang both have).
+
+        # Fix 1: gate the include on header availability, not compiler identity.
         replace_in_file(
             self, bit_h,
-            "#include <byteswap.h>",
-            "#if defined(__has_include)\n"
-            "#  if __has_include(<byteswap.h>)\n"
-            "#    include <byteswap.h>\n"
-            "#  endif\n"
-            "#elif defined(__linux__)\n"
-            "#  include <byteswap.h>\n"
+            "#ifdef __GNUC__\n"
+            "#include <byteswap.h>  // \"These functions are GNU extensions.\"\n"
             "#endif",
+            "#if defined(__has_include) && __has_include(<byteswap.h>)\n"
+            "#  include <byteswap.h>\n"
+            "#  define CODA_OSS_HAS_BSWAP_BUILTINS 1\n"
+            "#endif",
+        )
+
+        # Fix 2: gate the bswap_* call sites on the same flag, with __builtin_bswap_*
+        # fallbacks that work on both Clang and GCC.
+        replace_in_file(
+            self, bit_h,
+            "    #elif defined(__GNUC__)\n"
+            "    inline uint16_t byteswap(uint16_t val) noexcept\n"
+            "    {\n"
+            "        return bswap_16(val);\n"
+            "    }\n"
+            "    inline uint32_t byteswap(uint32_t val) noexcept\n"
+            "    {\n"
+            "        return bswap_32(val);\n"
+            "    }\n"
+            "    inline uint64_t byteswap(uint64_t val) noexcept\n"
+            "    {\n"
+            "        return bswap_64(val);\n"
+            "    }",
+            "    #elif defined(CODA_OSS_HAS_BSWAP_BUILTINS)\n"
+            "    inline uint16_t byteswap(uint16_t val) noexcept\n"
+            "    {\n"
+            "        return bswap_16(val);\n"
+            "    }\n"
+            "    inline uint32_t byteswap(uint32_t val) noexcept\n"
+            "    {\n"
+            "        return bswap_32(val);\n"
+            "    }\n"
+            "    inline uint64_t byteswap(uint64_t val) noexcept\n"
+            "    {\n"
+            "        return bswap_64(val);\n"
+            "    }\n"
+            "    #elif defined(__GNUC__) || defined(__clang__)\n"
+            "    inline uint16_t byteswap(uint16_t val) noexcept\n"
+            "    {\n"
+            "        return __builtin_bswap16(val);\n"
+            "    }\n"
+            "    inline uint32_t byteswap(uint32_t val) noexcept\n"
+            "    {\n"
+            "        return __builtin_bswap32(val);\n"
+            "    }\n"
+            "    inline uint64_t byteswap(uint64_t val) noexcept\n"
+            "    {\n"
+            "        return __builtin_bswap64(val);\n"
+            "    }",
         )
 
     def generate(self):
