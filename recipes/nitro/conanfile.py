@@ -137,25 +137,27 @@ class NitroConan(ConanFile):
             tc.cache_variables["XERCES_HOME_VALID"] = True
             tc.cache_variables["CODA_BUILD_HDF5"] = False
 
-            # Two distinct mechanisms produce build errors here:
+            # Per-warning -Wno-error=<name> demotions only — bare -Wno-error doesn't
+            # stick because coda-oss's add_compile_options(-Werror) lands *after* our
+            # CMAKE_CXX_FLAGS in the compile line. Per-warning demotions ARE sticky:
+            # Clang doesn't re-promote them via a later -Werror.
             #
-            # 1. coda-oss enables -Werror project-wide for GNU|Clang, promoting any
-            #    warning to an error. Apple Clang flags warnings that GCC doesn't
-            #    (-Wunused-but-set-variable, GCC-only warning names, etc.).
-            # 2. Apple Clang (Xcode 15+) made several legacy-C diagnostics
-            #    *default-errors* — they fail the build regardless of -Werror.
-            #    The bundled zlib/jpeg/pcre2 drivers predate C99 hygiene and trip
-            #    these regularly.
-            #
-            # -Wno-error addresses (1); -Wno-error=<name> addresses (2). Both needed.
-            macos_c_flags = [
-                "-Wno-error",
+            # Two failure modes covered:
+            #  1. Apple Clang (Xcode 15+) default-errors — fail regardless of -Werror,
+            #     hit by vintage C in bundled zlib/jpeg/pcre2.
+            #  2. -Werror promotions of warnings Apple Clang emits but GCC doesn't —
+            #     GCC-only -W flag names, alt_format-style dead assignments, etc.
+            macos_warning_flags = [
+                # (1) Default-errors:
                 "-Wno-error=implicit-function-declaration",
                 "-Wno-error=implicit-int",
                 "-Wno-error=incompatible-function-pointer-types",
+                # (2) -Werror promotions:
+                "-Wno-error=unknown-warning-option",   # GCC-only -W flag names
+                "-Wno-error=unused-but-set-variable",  # alt_format in DateTime.c
             ]
-            tc.extra_cflags.extend(macos_c_flags)
-            tc.extra_cxxflags.append("-Wno-error")
+            tc.extra_cflags.extend(macos_warning_flags)
+            tc.extra_cxxflags.extend(macos_warning_flags)
 
         # Public header switch — must be visible to consumers too (see package_info).
         if self.options.preload_tres:
