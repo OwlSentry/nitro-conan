@@ -11,6 +11,7 @@ required_conan_version = ">=2.4"
 
 class NitroConan(ConanFile):
     name = "nitro"
+    version = "2.11.7"
     description = (
         "NITRO (NITFio) — full-fledged, extensible C/C++ library for reading "
         "and writing the U.S. DoD National Imagery Transmission Format (NITF)."
