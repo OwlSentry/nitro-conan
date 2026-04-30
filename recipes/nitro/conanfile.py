@@ -89,8 +89,192 @@ class NitroConan(ConanFile):
             )
 
     def source(self):
-        get(self, **self.conan_data["sources"][self.version], strip_root=True)
-        apply_conandata_patches(self)
+    get(self, **self.conan_data["sources"][self.version], strip_root=True)
+    apply_conandata_patches(self)
+
+    # The remaining source modifications are macOS portability fixes that
+    # preserve Linux behavior (every change adds an Apple arm or gates a
+    # glibc-only include behind __has_include). They live as replace_in_file
+    # rather than patches because content-anchored matching is more robust
+    # than line-anchored hunk headers when small upstream drift can occur.
+
+    # Conf.h: gate <features.h> on __has_include and add Apple arms to the
+    # CODA_OSS_POSIX*_SOURCE macros so alignedAlloc and the platform dispatch
+    # find their POSIX paths on macOS.
+    sys_conf_h = os.path.join(
+        self.source_folder, "externals", "coda-oss",
+        "modules", "c++", "sys", "include", "sys", "Conf.h",
+    )
+    replace_in_file(
+        self, sys_conf_h,
+        "#ifndef _WIN32\n"
+        "#include <features.h>\n"
+        "#endif",
+        "#ifndef _WIN32\n"
+        "#  if defined(__has_include)\n"
+        "#    if __has_include(<features.h>)\n"
+        "#      include <features.h>\n"
+        "#    endif\n"
+        "#  elif defined(__linux__)\n"
+        "#    include <features.h>\n"
+        "#  endif\n"
+        "#endif",
+    )
+    replace_in_file(
+        self, sys_conf_h,
+        "#undef CODA_OSS_POSIX_SOURCE\n"
+        "#if defined(_POSIX_C_SOURCE) && (_POSIX_C_SOURCE >= 1)\n"
+        "#define CODA_OSS_POSIX_SOURCE _POSIX_C_SOURCE\n"
+        "#endif",
+        "#undef CODA_OSS_POSIX_SOURCE\n"
+        "#if defined(_POSIX_C_SOURCE) && (_POSIX_C_SOURCE >= 1)\n"
+        "#define CODA_OSS_POSIX_SOURCE _POSIX_C_SOURCE\n"
+        "#elif defined(__APPLE__)\n"
+        "// macOS is POSIX-compliant but doesn't define _POSIX_C_SOURCE the same way.\n"
+        "#define CODA_OSS_POSIX_SOURCE 200809L\n"
+        "#endif",
+    )
+    replace_in_file(
+        self, sys_conf_h,
+        "#undef CODA_OSS_POSIX2001_SOURCE\n"
+        "#if defined(CODA_OSS_POSIX_SOURCE) && (_POSIX_C_SOURCE >= 200112L)\n"
+        "#define CODA_OSS_POSIX2001_SOURCE _POSIX_C_SOURCE\n"
+        "#endif",
+        "#undef CODA_OSS_POSIX2001_SOURCE\n"
+        "#if defined(CODA_OSS_POSIX_SOURCE) && (_POSIX_C_SOURCE >= 200112L)\n"
+        "#define CODA_OSS_POSIX2001_SOURCE _POSIX_C_SOURCE\n"
+        "#elif defined(__APPLE__)\n"
+        "#define CODA_OSS_POSIX2001_SOURCE 200809L\n"
+        "#endif",
+    )
+    replace_in_file(
+        self, sys_conf_h,
+        "#undef CODA_OSS_POSIX2008_SOURCE\n"
+        "#if defined(CODA_OSS_POSIX2001_SOURCE) && (_POSIX_C_SOURCE >= 200809L)\n"
+        "#define CODA_OSS_POSIX2008_SOURCE _POSIX_C_SOURCE\n"
+        "#endif",
+        "#undef CODA_OSS_POSIX2008_SOURCE\n"
+        "#if defined(CODA_OSS_POSIX2001_SOURCE) && (_POSIX_C_SOURCE >= 200809L)\n"
+        "#define CODA_OSS_POSIX2008_SOURCE _POSIX_C_SOURCE\n"
+        "#elif defined(__APPLE__)\n"
+        "#define CODA_OSS_POSIX2008_SOURCE 200809L\n"
+        "#endif",
+    )
+
+    # bit.h: detect <byteswap.h> via __has_include rather than __GNUC__
+    # (Apple Clang defines __GNUC__ but lacks the glibc header). Fall back
+    # to __builtin_bswap_* on platforms without the header.
+    bit_h = os.path.join(
+        self.source_folder, "externals", "coda-oss",
+        "modules", "c++", "coda_oss", "include", "coda_oss", "bit.h",
+    )
+    replace_in_file(
+        self, bit_h,
+        '#ifdef __GNUC__\n'
+        '#include <byteswap.h>  // "These functions are GNU extensions."\n'
+        '#endif',
+        "#if defined(__has_include) && __has_include(<byteswap.h>)\n"
+        "#  include <byteswap.h>\n"
+        "#  define CODA_OSS_HAS_BSWAP_BUILTINS 1\n"
+        "#endif",
+    )
+    replace_in_file(
+        self, bit_h,
+        "    #elif defined(__GNUC__)\n"
+        "    inline uint16_t byteswap(uint16_t val) noexcept\n"
+        "    {\n"
+        "        return bswap_16(val);\n"
+        "    }\n"
+        "    inline uint32_t byteswap(uint32_t val) noexcept\n"
+        "    {\n"
+        "        return bswap_32(val);\n"
+        "    }\n"
+        "    inline uint64_t byteswap(uint64_t val) noexcept\n"
+        "    {\n"
+        "        return bswap_64(val);\n"
+        "    }",
+        "    #elif defined(CODA_OSS_HAS_BSWAP_BUILTINS)\n"
+        "    inline uint16_t byteswap(uint16_t val) noexcept\n"
+        "    {\n"
+        "        return bswap_16(val);\n"
+        "    }\n"
+        "    inline uint32_t byteswap(uint32_t val) noexcept\n"
+        "    {\n"
+        "        return bswap_32(val);\n"
+        "    }\n"
+        "    inline uint64_t byteswap(uint64_t val) noexcept\n"
+        "    {\n"
+        "        return bswap_64(val);\n"
+        "    }\n"
+        "    #elif defined(__GNUC__) || defined(__clang__)\n"
+        "    inline uint16_t byteswap(uint16_t val) noexcept\n"
+        "    {\n"
+        "        return __builtin_bswap16(val);\n"
+        "    }\n"
+        "    inline uint32_t byteswap(uint32_t val) noexcept\n"
+        "    {\n"
+        "        return __builtin_bswap32(val);\n"
+        "    }\n"
+        "    inline uint64_t byteswap(uint64_t val) noexcept\n"
+        "    {\n"
+        "        return __builtin_bswap64(val);\n"
+        "    }",
+    )
+
+    # OS.h: complete the MacOS arm of PlatformType (upstream had it as a
+    # // MacOS comment placeholder).
+    sys_os_h = os.path.join(
+        self.source_folder, "externals", "coda-oss",
+        "modules", "c++", "sys", "include", "sys", "OS.h",
+    )
+    replace_in_file(
+        self, sys_os_h,
+        "    Windows,\n"
+        "    Linux,\n"
+        "    // MacOS\n"
+        "};",
+        "    Windows,\n"
+        "    Linux,\n"
+        "    MacOS,\n"
+        "};",
+    )
+    replace_in_file(
+        self, sys_os_h,
+        "#if defined(_WIN32)\n"
+        "constexpr auto Platform = PlatformType::Windows;\n"
+        "#elif defined(CODA_OSS_POSIX2008_SOURCE)\n"
+        "constexpr auto Platform = PlatformType::Linux;\n"
+        "#else\n"
+        '#error "Unknown platform."\n'
+        "#endif",
+        "#if defined(_WIN32)\n"
+        "constexpr auto Platform = PlatformType::Windows;\n"
+        "#elif defined(__APPLE__)\n"
+        "constexpr auto Platform = PlatformType::MacOS;\n"
+        "#elif defined(CODA_OSS_POSIX2008_SOURCE)\n"
+        "constexpr auto Platform = PlatformType::Linux;\n"
+        "#else\n"
+        '#error "Unknown platform."\n'
+        "#endif",
+    )
+    replace_in_file(
+        self, sys_os_h,
+        "template <>\n"
+        "inline std::string platformName<PlatformType::Linux>()\n"
+        "{\n"
+        '    return "linux-gnu";\n'
+        "}",
+        "template <>\n"
+        "inline std::string platformName<PlatformType::Linux>()\n"
+        "{\n"
+        '    return "linux-gnu";\n'
+        "}\n"
+        "template <>\n"
+        "inline std::string platformName<PlatformType::MacOS>()\n"
+        "{\n"
+        '    return "darwin";\n'
+        "}",
+    )
 
     def generate(self):
         tc = CMakeToolchain(self)

@@ -11,15 +11,3 @@ patches:
     - patch_file: "patches/2.11.7-0002-macos-xerces-frameworks.patch"
       patch_description: "Add CoreServices/CoreFoundation frameworks to the XML_HOME link probe on macOS so it can validate Apple xerces builds."
       patch_type: "portability"
-    - patch_file: "patches/2.11.7-0004-macos-coda-oss-features-h.patch"
-      patch_description: "Gate <features.h> inclusion in sys/Conf.h on __has_include; macOS lacks this glibc-specific header. Set CODA_OSS_POSIX*_SOURCE explicitly on Apple so alignedAlloc routes to posix_memalign."
-      patch_type: "portability"
-      fuzz: True
-    - patch_file: "patches/2.11.7-0005-macos-coda-oss-byteswap-h.patch"
-      patch_description: "coda_oss/bit.h conflated __GNUC__ (any GCC-compatible compiler, incl. Apple Clang) with glibc (which provides <byteswap.h>). Detect the header via __has_include and fall back to __builtin_bswap_* on Apple."
-      patch_type: "portability"
-      fuzz: True
-    - patch_file: "patches/2.11.7-0006-macos-coda-oss-platform-detect.patch"
-      patch_description: "Add MacOS to the PlatformType enum in sys/OS.h and dispatch __APPLE__ to it. Upstream had this as a TODO comment."
-      patch_type: "portability"
-      fuzz: True
