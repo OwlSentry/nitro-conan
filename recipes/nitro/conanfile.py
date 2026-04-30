@@ -33,6 +33,7 @@ class NitroConan(ConanFile):
         "enable_pcre":   [True, False],   # ENABLE_PCRE  (bundled pcre2)
         "with_uuid":     [True, False],   # ENABLE_UUID — Linux/FreeBSD only
         "preload_tres":  [True, False],   # NITRO 2.11.6+: static TRE preloading (public macro)
+        "enable_hdf5":   [True, False],   # ENABLE_HDF5 — Linux-only in current form
     }
     default_options = {
         "shared":        False,
@@ -46,6 +47,7 @@ class NitroConan(ConanFile):
         # coda-oss's xml.lite hard-asserts XMLCh == char16_t; CCI xerces defaults
         # to uint16_t. Pin the type so the assert holds.
         "xerces-c/*:char_type": "char16_t",
+         "enable_hdf5":  False,
     }
 
     implements = ["auto_shared_fpic"]
@@ -91,6 +93,7 @@ class NitroConan(ConanFile):
     def generate(self):
         tc = CMakeToolchain(self)
         # Bindings + tests + tooling — all OFF.
+        tc.cache_variables["ENABLE_HDF5"] = bool(self.options.enable_hdf5)
         tc.cache_variables["ENABLE_PYTHON"]      = False
         tc.cache_variables["ENABLE_SWIG"]        = False
         tc.cache_variables["ENABLE_JARS"]        = False
@@ -123,7 +126,16 @@ class NitroConan(ConanFile):
             # HAVE_UNISTD_H, which the driver build doesn't set. Demote to warning
             # so the bundled C drivers (zlib, jpeg, pcre2) still compile cleanly.
             tc.extra_cflags.append("-Wno-error=implicit-function-declaration")
-            
+            # coda-oss unconditionally passes GCC-only warning flags (-Wduplicated-
+            # branches, -Wtrampolines, -Wno-maybe-uninitialized) on non-MSVC builds.
+            # Apple clang doesn't recognise them and errors under -Werror. Demote
+            # unknown-warning-option to a warning so they stay visible in logs but
+            # don't fail the build. Applies to both C and C++ — Backtrace.cpp is C++,
+            # the driver sources are C.
+            unknown_warn = "-Wno-error=unknown-warning-option"
+            tc.extra_cflags.append(unknown_warn)
+            tc.extra_cxxflags.append(unknown_warn)
+
         # Public header switch — must be visible to consumers too (see package_info).
         if self.options.preload_tres:
             tc.preprocessor_definitions["NITRO_PRELOAD_TRES"] = "1"
