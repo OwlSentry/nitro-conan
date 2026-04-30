@@ -148,13 +148,13 @@ class NitroConan(ConanFile):
             #  2. -Werror promotions of warnings Apple Clang emits but GCC doesn't —
             #     GCC-only -W flag names, alt_format-style dead assignments, etc.
             macos_warning_flags = [
-                # (1) Default-errors:
                 "-Wno-error=implicit-function-declaration",
                 "-Wno-error=implicit-int",
                 "-Wno-error=incompatible-function-pointer-types",
-                # (2) -Werror promotions:
-                "-Wno-error=unknown-warning-option",   # GCC-only -W flag names
-                "-Wno-error=unused-but-set-variable",  # alt_format in DateTime.c
+                "-Wno-error=unknown-warning-option",
+                "-Wno-error=unused-but-set-variable",
+                "-Wno-error=deprecated-declarations",   # vsprintf in Format.cpp
+                "-Wno-error=unused-function",            # utf16to1252 in Encoding.cpp
             ]
             tc.extra_cflags.extend(macos_warning_flags)
             tc.extra_cxxflags.extend(macos_warning_flags)
