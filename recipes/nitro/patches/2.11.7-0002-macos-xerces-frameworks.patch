@@ -1,0 +1,12 @@
+--- a/externals/coda-oss/modules/drivers/xml/xerces/CMakeLists.txt
++++ b/externals/coda-oss/modules/drivers/xml/xerces/CMakeLists.txt
+@@ -16,6 +16,9 @@ if (WIN32)
+     set(EXTERNAL_DEPS ws2_32 advapi32)
+ elseif (UNIX)
+     set(EXTERNAL_DEPS pthread)
++    if (APPLE)
++        list(APPEND EXTERNAL_DEPS "-framework CoreServices" "-framework CoreFoundation")
++    endif()
+ endif()
+ 
+ if (XML_HOME)

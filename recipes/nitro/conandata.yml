@@ -6,5 +6,8 @@ sources:
 patches:
   "2.11.7":
     - patch_file: "patches/2.11.7-0001-fix-char8t-cxx20-compat.patch"
-      patch_description: "Silence -Wc++20-compat warning on the char8_t enum-class so coda-oss's -Werror doesn't abort the build under gcc 10+."
+      patch_description: "Silence -Wc++20-compat warning..."
+      patch_type: "portability"
+    - patch_file: "patches/2.11.7-0002-macos-xerces-frameworks.patch"
+      patch_description: "Add CoreServices/CoreFoundation frameworks to the XML_HOME link probe on macOS so it can validate Apple xerces builds."
       patch_type: "portability"

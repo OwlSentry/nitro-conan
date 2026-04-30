@@ -53,26 +53,9 @@ jobs:
       - name: conan create
         run: conan create recipes/nitro --build=missing -s compiler.cppstd=17
 
-      - name: Verify package contents
+      - name: Dump CMake error logs on failure
+        if: failure()
         shell: bash
         run: |
-          PKG=$(conan cache path nitro/2.11.7)
-          echo "Package folder: $PKG"
-          echo "--- libs ---"
-          ls "$PKG/lib" | head -40
-          echo "--- TRE plugins ---"
-          ls "$PKG/share/nitf/plugins" | head -10
-          echo "--- arch check ---"
-          if [[ "${{ runner.os }}" == "macOS" ]]; then
-            FIRST_LIB=$(find "$PKG/lib" -maxdepth 1 \( -name '*.dylib' -o -name '*.a' \) | head -1)
-            file "$FIRST_LIB"
-            if [[ "$FIRST_LIB" == *.dylib ]]; then
-              echo "--- install_name ---"
-              otool -D "$FIRST_LIB"
-              echo "--- linkage ---"
-              otool -L "$FIRST_LIB" | grep -v '/usr/lib' | grep -v '/System' || true
-            fi
-          else
-            FIRST_LIB=$(find "$PKG/lib" -maxdepth 1 \( -name '*.so*' -o -name '*.a' \) | head -1)
-            file "$FIRST_LIB"
-          fi
+          find ~/.conan2/p -name 'CMakeError.log' -exec sh -c 'echo "=== $1 ==="; cat "$1"' _ {} \;
+          find ~/.conan2/p -name 'CMakeOutput.log' -exec sh -c 'echo "=== $1 ==="; tail -100 "$1"' _ {} \;
