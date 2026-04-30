@@ -3,7 +3,10 @@ from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.build import check_min_cppstd
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
-from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get, rmdir, rm
+from conan.tools.files import (
+    apply_conandata_patches, copy, export_conandata_patches, get, rmdir, rm,
+    replace_in_file,
+)
 from conan.tools.apple import fix_apple_shared_install_name
 
 required_conan_version = ">=2.4"
@@ -90,10 +93,26 @@ class NitroConan(ConanFile):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
         apply_conandata_patches(self)
 
+        if self.settings.os == "Macos":
+        # Drop the bundled HDF5 driver on macOS only. coda-oss doesn't expose
+        # an ENABLE_HDF5 toggle (verified against upstream's conanfile.py),
+        # and the vendored H5pubconf.h unconditionally includes <features.h>,
+        # which is glibc-only. nitro-c/c++ has no dependency on hdf5-c++, so
+        # removing the add_subdirectory is sufficient. Linux builds are
+        # unaffected.
+        drivers_cml = os.path.join(
+            self.source_folder, "externals", "coda-oss",
+            "modules", "drivers", "CMakeLists.txt",
+        )
+        replace_in_file(
+            self, drivers_cml,
+            'add_subdirectory("hdf5")',
+            '# add_subdirectory("hdf5")  # disabled on macOS: glibc-only H5pubconf.h',
+        )
+
     def generate(self):
         tc = CMakeToolchain(self)
         # Bindings + tests + tooling — all OFF.
-        tc.cache_variables["CODA_BUILD_HDF5"] = bool(self.options.enable_hdf5)
         tc.cache_variables["ENABLE_PYTHON"]      = False
         tc.cache_variables["ENABLE_SWIG"]        = False
         tc.cache_variables["ENABLE_JARS"]        = False

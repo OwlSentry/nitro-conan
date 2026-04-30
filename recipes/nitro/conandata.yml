@@ -11,6 +11,3 @@ patches:
     - patch_file: "patches/2.11.7-0002-macos-xerces-frameworks.patch"
       patch_description: "Add CoreServices/CoreFoundation frameworks to the XML_HOME link probe on macOS so it can validate Apple xerces builds."
       patch_type: "portability"
-    - patch_file: "patches/2.11.7-0003-make-coda-hdf5-driver-optional.patch"
-      patch_description: "Make bundled HDF5 driver opt-in; disabled by default on Apple due to glibc-only features.h dependency."
-      patch_type: "portability"
