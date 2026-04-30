@@ -1,0 +1,8 @@
+--- a/externals/coda-oss/modules/drivers/CMakeLists.txt
++++ b/externals/coda-oss/modules/drivers/CMakeLists.txt
+@@
+-add_subdirectory("hdf5")
++option(CODA_BUILD_HDF5 "Build the bundled HDF5 driver" ON)
++if (CODA_BUILD_HDF5)
++    add_subdirectory("hdf5")
++endif()

@@ -93,7 +93,7 @@ class NitroConan(ConanFile):
     def generate(self):
         tc = CMakeToolchain(self)
         # Bindings + tests + tooling — all OFF.
-        tc.cache_variables["ENABLE_HDF5"] = bool(self.options.enable_hdf5)
+        tc.cache_variables["CODA_BUILD_HDF5"] = bool(self.options.enable_hdf5)
         tc.cache_variables["ENABLE_PYTHON"]      = False
         tc.cache_variables["ENABLE_SWIG"]        = False
         tc.cache_variables["ENABLE_JARS"]        = False
