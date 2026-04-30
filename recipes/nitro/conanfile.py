@@ -93,22 +93,23 @@ class NitroConan(ConanFile):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
         apply_conandata_patches(self)
 
-        if self.settings.os == "Macos":
-            # Drop the bundled HDF5 driver on macOS only. coda-oss doesn't expose
-            # an ENABLE_HDF5 toggle (verified against upstream's conanfile.py),
-            # and the vendored H5pubconf.h unconditionally includes <features.h>,
-            # which is glibc-only. nitro-c/c++ has no dependency on hdf5-c++, so
-            # removing the add_subdirectory is sufficient. Linux builds are
-            # unaffected.
-            drivers_cml = os.path.join(
-                self.source_folder, "externals", "coda-oss",
-                "modules", "drivers", "CMakeLists.txt",
-            )
-            replace_in_file(
-                self, drivers_cml,
-                'add_subdirectory("hdf5")',
-                '# add_subdirectory("hdf5")  # disabled on macOS: glibc-only H5pubconf.h',
-            )
+        # Add an option gate around the bundled HDF5 driver. Defaults ON, so
+        # Linux builds behave exactly as before. The macOS branch of generate()
+        # flips it off because the vendored H5pubconf.h includes <features.h>,
+        # which is glibc-only. Settings-agnostic by design — Conan 2 forbids
+        # self.settings access in source().
+        drivers_cml = os.path.join(
+            self.source_folder, "externals", "coda-oss",
+            "modules", "drivers", "CMakeLists.txt",
+        )
+        replace_in_file(
+            self, drivers_cml,
+            'add_subdirectory("hdf5")',
+            'option(CODA_BUILD_HDF5 "Build the bundled HDF5 driver" ON)\n'
+            'if (CODA_BUILD_HDF5)\n'
+            '    add_subdirectory("hdf5")\n'
+            'endif()',
+        )
 
     def generate(self):
         tc = CMakeToolchain(self)
@@ -154,6 +155,7 @@ class NitroConan(ConanFile):
             unknown_warn = "-Wno-error=unknown-warning-option"
             tc.extra_cflags.append(unknown_warn)
             tc.extra_cxxflags.append(unknown_warn)
+            tc.cache_variables["CODA_BUILD_HDF5"] = False
 
         # Public header switch — must be visible to consumers too (see package_info).
         if self.options.preload_tres:
