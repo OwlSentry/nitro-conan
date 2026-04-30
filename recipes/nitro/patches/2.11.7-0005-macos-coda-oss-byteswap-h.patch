@@ -1,4 +1,23 @@
-@@ -1 +1 @@
+--- a/externals/coda-oss/modules/c++/coda_oss/include/coda_oss/bit.h
++++ b/externals/coda-oss/modules/c++/coda_oss/include/coda_oss/bit.h
+@@ -23,9 +23,10 @@
+ #define CODA_OSS_coda_oss_bit_h_INCLUDED_
+ #include <stdlib.h>
+ #include <stdint.h>
+-#ifdef __GNUC__
+-#include <byteswap.h>  // "These functions are GNU extensions."
+-#endif
++#if defined(__has_include) && __has_include(<byteswap.h>)
++#  include <byteswap.h>
++#  define CODA_OSS_HAS_BSWAP_BUILTINS 1
++#endif
+ #include <type_traits>
+ #include "coda_oss/namespace_.h"
+ namespace coda_oss
+@@ -66,19 +67,32 @@
+     {
+         return _byteswap_uint64(val);
+     }
 -    #elif defined(__GNUC__)
 +    #elif defined(CODA_OSS_HAS_BSWAP_BUILTINS)
      inline uint16_t byteswap(uint16_t val) noexcept
@@ -27,3 +46,5 @@
 +        return __builtin_bswap64(val);
 +    }
      #else
+     #error "No platform-specific byteswap()" // TODO: do something else?
+     #endif

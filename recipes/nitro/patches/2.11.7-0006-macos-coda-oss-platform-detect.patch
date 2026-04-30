@@ -1,6 +1,6 @@
 --- a/externals/coda-oss/modules/c++/sys/include/sys/OS.h
 +++ b/externals/coda-oss/modules/c++/sys/include/sys/OS.h
-@@ -1 +1 @@
+@@ -53,16 +53,18 @@
  enum class PlatformType
  {
      Windows,
@@ -8,6 +8,7 @@
 -    // MacOS
 +    MacOS,
  };
+ 
  #if defined(_WIN32)
  constexpr auto Platform = PlatformType::Windows;
 +#elif defined(__APPLE__)
@@ -17,15 +18,10 @@
  #else
  #error "Unknown platform."
  #endif
+ 
  template <PlatformType>
  inline std::string platformName();
- template <>
- inline std::string platformName<PlatformType::Windows>()
- {
-     return "Windows";
- }
- template <>
- inline std::string platformName<PlatformType::Linux>()
+@@ -76,6 +78,11 @@
  {
      return "linux-gnu";
  }
@@ -34,4 +30,5 @@
 +{
 +    return "darwin";
 +}
+ 
  }
