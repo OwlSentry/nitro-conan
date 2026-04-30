@@ -1,0 +1,33 @@
+From: nitro-conan recipe maintainer
+Subject: [PATCH] Disable -Werror in top-level CMakeLists
+
+Both nitro and coda-oss enable -Werror unconditionally on UNIX. Newer
+Apple Clang (macOS-14 runner) and aarch64 gcc flag real-but-pre-existing
+issues in coda-oss/modules/c++/sys/source/DateTime.cpp and
+str/include/str/Convert.h that x86_64 gcc doesn't. -Werror makes the
+build a function of (library version, compiler version) instead of just
+(library version), which is hostile for downstream packaging. Warnings
+still print.
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -19,7 +19,7 @@
+        endif()
+ 
+     elseif (UNIX)
+-       add_compile_options(-Werror) # warnings as errors
++       # -Werror removed for downstream packaging (Conan).
+ 
+        if (ENABLE_ASAN)
+        	  # https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html
+--- a/externals/coda-oss/CMakeLists.txt
++++ b/externals/coda-oss/CMakeLists.txt
+@@ -25,7 +25,7 @@
+        add_compile_options(/WX) # warnings as errors
+        add_compile_options(/MP) # multi-processor compile
+     elseif (UNIX)
+-       add_compile_options(-Werror) # warnings as errors
++       # -Werror removed for downstream packaging (Conan).
+     endif()
+ 
+     list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")

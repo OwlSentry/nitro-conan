@@ -11,3 +11,6 @@ patches:
     - patch_file: "patches/2.11.7-0002-macos-xerces-frameworks.patch"
       patch_description: "Add CoreServices/CoreFoundation frameworks to the XML_HOME link probe on macOS so it can validate Apple xerces builds."
       patch_type: "portability"
+    - patch_file: "patches/2.11.7-0003-disable-werror.patch"
+      patch_description: "Remove -Werror from the two top-level CMakeLists files (nitro + coda-oss). Apple Clang and aarch64 gcc flag real upstream issues in coda-oss/sys/DateTime.cpp and str/Convert.h that x86_64 gcc doesn't, and -Werror makes the build a function of compiler version. Warnings still print."
+      patch_type: "portability"
