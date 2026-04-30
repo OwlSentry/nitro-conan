@@ -137,13 +137,24 @@ class NitroConan(ConanFile):
             tc.cache_variables["XERCES_HOME_VALID"] = True
             tc.cache_variables["CODA_BUILD_HDF5"] = False
 
-            # coda-oss enables -Werror project-wide for GNU|Clang. Apple Clang flags
-            # warnings that GCC doesn't (-Wunused-but-set-variable, -Wimplicit-
-            # function-declaration in vendored zlib, etc.), so -Werror produces a
-            # steady drip of build failures across coda-oss + bundled drivers.
-            # Disable -Werror entirely on macOS — this is vendored upstream code we
-            # don't own; warnings stay visible in build logs but don't fail the build.
-            tc.extra_cflags.append("-Wno-error")
+            # Two distinct mechanisms produce build errors here:
+            #
+            # 1. coda-oss enables -Werror project-wide for GNU|Clang, promoting any
+            #    warning to an error. Apple Clang flags warnings that GCC doesn't
+            #    (-Wunused-but-set-variable, GCC-only warning names, etc.).
+            # 2. Apple Clang (Xcode 15+) made several legacy-C diagnostics
+            #    *default-errors* — they fail the build regardless of -Werror.
+            #    The bundled zlib/jpeg/pcre2 drivers predate C99 hygiene and trip
+            #    these regularly.
+            #
+            # -Wno-error addresses (1); -Wno-error=<name> addresses (2). Both needed.
+            macos_c_flags = [
+                "-Wno-error",
+                "-Wno-error=implicit-function-declaration",
+                "-Wno-error=implicit-int",
+                "-Wno-error=incompatible-function-pointer-types",
+            ]
+            tc.extra_cflags.extend(macos_c_flags)
             tc.extra_cxxflags.append("-Wno-error")
 
         # Public header switch — must be visible to consumers too (see package_info).
