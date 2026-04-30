@@ -127,6 +127,22 @@ class NitroConan(ConanFile):
             "#endif",
         )
 
+        bit_h = os.path.join(
+            self.source_folder, "externals", "coda-oss",
+            "modules", "c++", "coda_oss", "include", "coda_oss", "bit.h",
+        )
+        replace_in_file(
+            self, bit_h,
+            "#include <byteswap.h>",
+            "#if defined(__has_include)\n"
+            "#  if __has_include(<byteswap.h>)\n"
+            "#    include <byteswap.h>\n"
+            "#  endif\n"
+            "#elif defined(__linux__)\n"
+            "#  include <byteswap.h>\n"
+            "#endif",
+        )
+
     def generate(self):
         tc = CMakeToolchain(self)
         # Bindings + tests + tooling — all OFF.
