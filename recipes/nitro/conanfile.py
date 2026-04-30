@@ -80,9 +80,9 @@ class NitroConan(ConanFile):
         xch = self.dependencies["xerces-c"].options.get_safe("char_type")
         if xch != "char16_t":
             raise ConanInvalidConfiguration(
-                f"{self.ref} with enable_xml=True requires xerces-c/*:char_type=char16_t "
-                f"(got {xch}). coda-oss's ValidatorXerces.cpp asserts XMLCh == char16_t."
-            )
+             f"{self.ref} requires xerces-c/*:char_type=char16_t (got {xch}). "
+             f"coda-oss's ValidatorXerces.cpp asserts XMLCh == char16_t."
+         )
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
@@ -110,6 +110,13 @@ class NitroConan(ConanFile):
         # macOS: keep install_name @rpath-relative so consumers' dyld resolution
         # works after the package moves between cache slots.
         tc.cache_variables["CMAKE_INSTALL_NAME_DIR"] = "@rpath"
+        if self.settings.os == "Macos":
+            # coda-oss's XML_HOME link-probe (modules/drivers/xml/xerces/
+            # CMakeLists.txt:36-50) only adds `pthread` to its check_cxx_source_
+            # compiles call. Apple xerces needs CoreServices/CoreFoundation
+            # frameworks too, so the probe fails. Skip it — Conan's xerces is
+            # known good.
+            tc.cache_variables["XERCES_HOME_VALID"] = True
         # Public header switch — must be visible to consumers too (see package_info).
         if self.options.preload_tres:
             tc.preprocessor_definitions["NITRO_PRELOAD_TRES"] = "1"
